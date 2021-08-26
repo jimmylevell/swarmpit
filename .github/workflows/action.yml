@@ -1,0 +1,31 @@
+name: Publish levell swarmpit docker image
+
+on:
+  # Trigger the workflow on push
+  # but only for the master branch
+  push:
+    branches:
+      - master
+
+jobs:
+  push_to_registry:
+    name: Push levell swarmpit docker images to GitHub Packages
+    runs-on: ubuntu-latest
+    
+    steps:
+      - 
+        name: Check out the repo
+        uses: actions/checkout@v2
+      -
+        name: Deploy to swarm
+        uses: wshihadeh/docker-deployment-action@v2
+        with:
+          remote_docker_host: docker@levell.ch
+          ssh_private_key: ${{ secrets.DOCKER_SSH_PRIVATE_KEY }}
+          ssh_public_key: ${{ secrets.DOCKER_SSH_PUBLIC_KEY }}
+          deployment_mode: docker-swarm
+          copy_stack_file: true
+          pull_images_first: true
+          deploy_path: /home/docker/levell/swarmpit
+          stack_file_name: docker-compose.prod.yml
+          args: --with-registry-auth --prune swarmpit

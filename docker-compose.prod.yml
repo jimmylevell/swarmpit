@@ -1,0 +1,99 @@
+version: '3.9'
+
+services:
+  levell-swarmpit:
+    image: swarmpit/swarmpit:latest
+    environment:
+      - SWARMPIT_DB=http://levell-swarmpit-db:5984
+      - SWARMPIT_INFLUXDB=http://levell-swarmpit-influxdb:8086
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - levell
+      - traefik-public
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+      labels:
+        - traefik.enable=true # enable traefik
+        - traefik.docker.network=traefik-public # put it in the same network as traefik
+        - traefik.constraint-label=traefik-public # assign the same label as traefik so it can be discovered
+        - traefik.http.routers.levellswarmpit.rule=Host(`swarmpit.sys.app.levell.ch`) # listen to port 80 for request to APP_DOMAIN (use together with the line below)
+        - traefik.http.routers.levellswarmpit.entrypoints=http
+        - traefik.http.routers.levellswarmpit.middlewares=https-redirect
+        - traefik.http.middlewares.levellswarmpit.redirectscheme.scheme=https # redirect traffic to https
+        - traefik.http.middlewares.levellswarmpit.redirectscheme.permanent=true # redirect traffic to https
+        - traefik.http.routers.levellswarmpit-secured.rule=Host(`swarmpit.sys.app.levell.ch`) # listen to port 443 for request to APP_DOMAIN (use together with the line below)
+        - traefik.http.routers.levellswarmpit-secured.entrypoints=https
+        - traefik.http.routers.levellswarmpit-secured.tls.certresolver=le # use the Let's Encrypt certificate we set up earlier
+        - traefik.http.services.levellswarmpit-secured.loadbalancer.server.port=8080 # ask Traefik to search for port service container
+
+  levell-swarmpit-db:
+    image: couchdb:2.3.0
+    volumes:
+      - swarmpit-db-data:/opt/couchdb/data
+    networks:
+      - levell
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+
+  levell-swarmpit-influxdb:
+    image: influxdb:1.7
+    volumes:
+      - swarmpit-influx-data:/var/lib/influxdb
+    networks:
+      - levell
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+
+  swarmpit-agent:
+    image: swarmpit/agent:latest
+    environment:
+      - DOCKER_API_VERSION=1.41
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - levell
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+      labels:
+        swarmpit.agent: 'true'
+
+networks:
+  traefik-public:
+    external: true
+  levell:
+    external: true
+
+volumes:
+  swarmpit-db-data:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: /srv/docker/swarmpit/db
+  swarmpit-influx-data:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: /srv/docker/swarmpit/influx
