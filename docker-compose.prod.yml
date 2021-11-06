@@ -3,7 +3,7 @@ version: '3.9'
 services:
   levell-swarmpit:
     image: swarmpit/swarmpit:latest
-    environment:
+    environment: 
       - SWARMPIT_DB=http://levell-swarmpit-db:5984
       - SWARMPIT_INFLUXDB=http://levell-swarmpit-influxdb:8086
     volumes:
